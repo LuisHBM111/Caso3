@@ -18,7 +18,7 @@ import javax.crypto.spec.IvParameterSpec;
 public class ServidorPrincipal {
 	
 	private int puerto;
-	private Map<Integer, Servicio> tablaServicios;
+	static Map<Integer, Servicio> tablaServicios;
 	private PrivateKey llavePrivadaRSA;
 	public PublicKey llavePublicaRSA;
 	public PublicKey llavePublicaCliente;
@@ -31,6 +31,25 @@ public class ServidorPrincipal {
 
 	public static void main(String[] args) throws IOException {
 		
+		KeyPair keyPair = null;
+		int puerto = 1234;
+		
+		try {
+			
+			keyPair = Criptografia.generarLlavesRSA();
+			
+		} catch (Exception e) {
+			
+		System.out.println("No se pudo generar la llave RSA");
+		e.printStackTrace();
+		
+		}
+
+		ServidorPrincipal servidor = new ServidorPrincipal(puerto);
+
+		servidor.cargarServicios();
+		servidor.cargarLLaves(keyPair);
+
 		Socket socket = null;
 		InputStreamReader inputStreamReader = null;
 		OutputStreamWriter outputStreamWriter = null;
@@ -38,7 +57,12 @@ public class ServidorPrincipal {
 		BufferedWriter bufferedWriter = null;
 		ServerSocket serverSocket = null;
 		
-		serverSocket = new ServerSocket(1234);
+		serverSocket = new ServerSocket(servidor.puerto);
+		
+		String serviciosList = new String();
+		for (Servicio servicio : tablaServicios.values()) {
+			serviciosList = serviciosList + " " + servicio.getId() + " - " + servicio.getNombre();
+		}
 		
 		while(true) {
 			
@@ -57,6 +81,30 @@ public class ServidorPrincipal {
 					String msgFromClient = bufferedReader.readLine();
 					
 					System.out.println("Cliente: " + msgFromClient);
+					
+					if(msgFromClient.equalsIgnoreCase("SERVICIOS")) {
+						bufferedWriter.write(serviciosList.toString() + " || ESCOGE UN SERVICIO CON SU ID");
+						bufferedWriter.newLine();
+						bufferedWriter.flush();
+						String msgFromClient2 = bufferedReader.readLine();
+						if(msgFromClient2.equalsIgnoreCase("1")) {
+							bufferedWriter.write("PUERTO: " + "5001");
+							bufferedWriter.newLine();
+							bufferedWriter.flush();
+						}else if(msgFromClient.equalsIgnoreCase("2")) {
+							bufferedWriter.write("PUERTO: " + "5002");
+							bufferedWriter.newLine();
+							bufferedWriter.flush();
+						}else if(msgFromClient.equalsIgnoreCase("3")) {
+							bufferedWriter.write("PUERTO: " + "5003");
+							bufferedWriter.newLine();
+							bufferedWriter.flush();
+						}else {
+							bufferedWriter.write("TENIAS QUE ESCRIBIR ´1´ O ´2´ O ´3´");
+							bufferedWriter.newLine();
+							bufferedWriter.flush();
+						}
+					}	
 					
 					bufferedWriter.write("Mensaje recibido");
 					bufferedWriter.newLine();
@@ -78,34 +126,13 @@ public class ServidorPrincipal {
 			}
 		}
 	
-	/*try {
-	keyPair = Criptografia.generarLlavesRSA();
-} catch (Exception e) {
-	System.out.println("No se pudo generar la llave RSA");
-	e.printStackTrace();
-}
-
-if (args.length != 1) {
-    System.out.println("Uso: java ServidorPrincipal <puerto>");
-    return;
-}
-
-int puerto = Integer.parseInt(args[0]);
-ServidorPrincipal servidor = new ServidorPrincipal(puerto);
-
-servidor.cargarServicios();
-servidor.cargarLLaves(keyPair);
-servidor.iniciarServidor();
-
-Cliente cliente = new Cliente(direccionServidor, puerto, llavePublicaRSA);*/
-	
 	private void cargarServicios() {
 		
 		tablaServicios = new HashMap<>();
 
-	    tablaServicios.put(1, new Servicio(1, "Consulta Estado de Vuelo", "192.168.1.2", 5001));
-	    tablaServicios.put(2, new Servicio(2, "Disponibilidad de Vuelos", "192.168.1.3", 5002));
-	    tablaServicios.put(3, new Servicio(3, "Costo de un Vuelo", "192.168.1.4", 5003));
+	    tablaServicios.put(1, new Servicio(1, "Consulta Estado de Vuelo", "localhost", 5001));
+	    tablaServicios.put(2, new Servicio(2, "Disponibilidad de Vuelos", "localhost", 5002));
+	    tablaServicios.put(3, new Servicio(3, "Costo de un Vuelo", "localhost", 5003));
 	    
 	}
 	
@@ -114,30 +141,6 @@ Cliente cliente = new Cliente(direccionServidor, puerto, llavePublicaRSA);*/
 		this.llavePrivadaRSA = kp.getPrivate();
 		this.llavePublicaRSA = kp.getPublic();
 		
-	}
-	
-	private void iniciarServidor() {
-		
-		try (ServerSocket serverSocket = new ServerSocket(puerto)) {
-	        System.out.println("Servidor escuchando en el puerto " + puerto + "...");
-
-	        while (true) {
-	            Socket clienteSocket = serverSocket.accept();
-	            System.out.println("Cliente conectado desde " + clienteSocket.getInetAddress().getHostAddress());
-
-	            new Thread(() -> {
-	                try {
-	                    atenderCliente(clienteSocket);
-	                } catch (Exception e) {
-	                    e.printStackTrace();
-	                }
-	            }).start();
-	        }
-	    } catch (IOException e) {
-	        System.out.println("Error iniciando el servidor: " + e.getMessage());
-	        e.printStackTrace();
-	    }
-	    
 	}
 
 	public static void atenderCliente(Socket clienteSocket) {
