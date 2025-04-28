@@ -1,5 +1,6 @@
 import java.io.IOException;
 import java.net.Socket;
+import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,15 +13,29 @@ import javax.crypto.spec.IvParameterSpec;
 
 public class Cliente {
 	
-	String direccionServidor;
-	static int puertoServidor;
-	PublicKey llavePublicaServidor;
-
-	public static void main(String[] args) {
-		//conectar();
-
-	}
+	private String direccionServidor;
+	private int puertoServidor;
+	private PrivateKey llavePrivadaCliente;
+	private PrivateKey llavePublicaCliente;
+	public PublicKey llavePublicaServidor;
 	
+	public Cliente(String direccionServidor, int puertoServidor, PublicKey llavePublicaServidor) {
+		
+		super();
+		this.direccionServidor = direccionServidor;
+		this.puertoServidor = puertoServidor;
+		this.llavePublicaServidor = llavePublicaServidor;
+		try {
+			this.llavePrivadaCliente = Criptografia.generarLlavesRSA().getPrivate();
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		conectar();
+		
+	}
+
 	private void conectar() {
 		
 		try (Socket socket = new Socket(direccionServidor, puertoServidor)) {

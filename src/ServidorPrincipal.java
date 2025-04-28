@@ -1,6 +1,7 @@
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.util.HashMap;
@@ -11,15 +12,43 @@ import javax.crypto.spec.IvParameterSpec;
 
 public class ServidorPrincipal {
 	
-	int puerto;
-	Map<Integer, Servicio> tablaServicios;
-	PrivateKey llavePrivadaRSA;
-	PublicKey llavePublicaRSA;
+	private int puerto;
+	private Map<Integer, Servicio> tablaServicios;
+	private PrivateKey llavePrivadaRSA;
+	public PublicKey llavePublicaRSA;
+	public PublicKey llavePublicaCliente;
 	
+	public ServidorPrincipal(int puerto) {
+		
+        this.puerto = puerto;
+        
+    }
 
 	public static void main(String[] args) {
-		//cargarServicios();
-		//iniciarServidor();
+		
+		KeyPair keyPair = null;
+		
+		try {
+			keyPair = Criptografia.generarLlavesRSA();
+		} catch (Exception e) {
+			System.out.println("No se pudo generar la llave RSA");
+			e.printStackTrace();
+		}
+		
+		if (args.length != 1) {
+            System.out.println("Uso: java ServidorPrincipal <puerto>");
+            return;
+        }
+
+        int puerto = Integer.parseInt(args[0]);
+        ServidorPrincipal servidor = new ServidorPrincipal(puerto);
+
+        servidor.cargarServicios();
+        servidor.cargarLLaves(keyPair);
+        servidor.iniciarServidor();
+        
+        Cliente cliente = new Cliente(direccionServidor, puerto, llavePublicaRSA);
+
 	}
 	
 	private void cargarServicios() {
@@ -30,6 +59,13 @@ public class ServidorPrincipal {
 	    tablaServicios.put(2, new Servicio(2, "Disponibilidad de Vuelos", "192.168.1.3", 5002));
 	    tablaServicios.put(3, new Servicio(3, "Costo de un Vuelo", "192.168.1.4", 5003));
 	    
+	}
+	
+	private void cargarLLaves(KeyPair kp) {
+		
+		this.llavePrivadaRSA = kp.getPrivate();
+		this.llavePublicaRSA = kp.getPublic();
+		
 	}
 	
 	private void iniciarServidor() {
