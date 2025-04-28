@@ -15,6 +15,8 @@ import java.util.Random;
 import java.util.Scanner;
 import java.util.Set;
 
+import javax.crypto.Cipher;
+import javax.crypto.Mac;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 
@@ -95,13 +97,6 @@ public class Cliente {
 		this.direccionServidor = direccionServidor;
 		this.puertoServidor = puertoServidor;
 		this.llavePublicaServidor = llavePublicaServidor;
-		try {
-			this.llavePrivadaCliente = Criptografia.generarLlavesRSA().getPrivate();
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		
 		conectar();
 		
 	}
@@ -111,22 +106,10 @@ public class Cliente {
 		try (Socket socket = new Socket(direccionServidor, puertoServidor)) {
 	        System.out.println("Conectado al servidor en " + direccionServidor + ":" + puertoServidor);
 
-	        protocoloConsulta(socket);
-
 	    } catch (IOException e) {
 	        System.out.println("Error conectando al servidor: " + e.getMessage());
 	        e.printStackTrace();
 	    }
-		
-	}
-
-	public static void protocoloConsulta(Socket socket) {
-		//Diffie-Hellman, recibe tabla, elige servicio, envía id, etc.
-		//mostrarServicios(Map<Integer, String> servicios)
-		//seleccionarServicio(Set<Integer> serviciosIdsDisponibles)
-	}
-
-	public static void mostrarServicios(Map<Integer, String> servicios) {
 		
 	}
 	
@@ -142,19 +125,28 @@ public class Cliente {
 		
 	}
 	
-	public static boolean verificarFirma(byte[] datos, byte[] firma) {
-		return false;
-		
-	}
-	
-	public static byte[] descifrarAES(byte[] datos, SecretKey llaveAES, IvParameterSpec iv) {
-		return datos;
-		
-	}
-	
-	public static boolean verificarHMAC(byte[] datos, byte[] hmacRecibido, SecretKey llaveHMAC) {
-		return false;
-		
+    public static byte[] cifrarAES(byte[] datos, SecretKey llaveAES, IvParameterSpec iv) throws Exception {
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.ENCRYPT_MODE, llaveAES, iv);
+        return cipher.doFinal(datos);
+    }
+
+    public static byte[] descifrarAES(byte[] datosCifrados, SecretKey llaveAES, IvParameterSpec iv) throws Exception {
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.DECRYPT_MODE, llaveAES, iv);
+        return cipher.doFinal(datosCifrados);
+    }
+
+    public static byte[] calcularHMAC(byte[] datos, SecretKey llaveHMAC) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(llaveHMAC);
+        return mac.doFinal(datos);
+    }
+    
+	public static void delegadosCliente(Socket socket) {
+		//Diffie-Hellman, recibe tabla, elige servicio, envía id, etc.
+		//mostrarServicios(Map<Integer, String> servicios)
+		//seleccionarServicio(Set<Integer> serviciosIdsDisponibles)
 	}
 	
 }

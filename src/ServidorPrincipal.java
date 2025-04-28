@@ -7,15 +7,20 @@ import java.math.BigInteger;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.security.KeyPair;
+import java.security.MessageDigest;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 
+import javax.crypto.Cipher;
+import javax.crypto.Mac;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 public class ServidorPrincipal {
     
@@ -25,6 +30,8 @@ public class ServidorPrincipal {
     private static BigInteger A = null;
     private static BigInteger B = null;
     private static BigInteger s = null;
+    
+    private SecretKey secretKey = null;
     
     private int puerto;
     static Map<Integer, Servicio> tablaServicios;
@@ -71,7 +78,10 @@ public class ServidorPrincipal {
                 bufferedWriter.newLine();
                 bufferedWriter.flush();
                 
-                bufferedWriter.write("ENVIA TU LLAVE PUBLICA AHORA");
+                String confirmacion = bufferedReader.readLine();
+                System.out.println("Confirmación cliente: " + confirmacion);
+
+                bufferedWriter.write("LLAVE PUBLICA GUARDADA, ESCRIBE ALGUN COMANDO");
                 bufferedWriter.newLine();
                 bufferedWriter.flush();
 
@@ -81,14 +91,19 @@ public class ServidorPrincipal {
                 if (clientePublicKeyStr != null && clientePublicKeyStr.matches("\\d+")) {
                     A = new BigInteger(clientePublicKeyStr.trim());
                     generarLLavePrivada();
-                    System.out.println("Llave pública del cliente A: " + A);
-                    System.out.println("Llave secreta generada (s): " + s);
+                    SecretKey[] llaves = generarLlaves(s.toByteArray());
+                    SecretKey llaveAES = llaves[0];
+                    SecretKey llaveHMAC = llaves[1]; 
+                    System.out.println("Llave pública del cliente: " + A);
+                    System.out.println("Llave privada generada: " + s);
+                    System.out.println("Llave privada cifrada: " + llaveAES);
+                    System.out.println("Llave privada hash: " + llaveHMAC);
                 } else {
                     System.err.println("Error en la llave pública recibida. Cerrando conexión.");
                     socket.close();
                     continue;
                 }
-                
+
                 while (true) {
                     String msgFromClient = bufferedReader.readLine();
                     
@@ -105,7 +120,7 @@ public class ServidorPrincipal {
                     }
                     
                     if (msgFromClient.equalsIgnoreCase("SERVICIOS")) {
-                        
+
                         bufferedWriter.write(serviciosList + " || ESCOGE UN SERVICIO CON SU ID");
                         bufferedWriter.newLine();
                         bufferedWriter.flush();
@@ -191,19 +206,47 @@ public class ServidorPrincipal {
         s = A.modPow(b, primo);
     }
     
-    public static void atenderCliente(Socket clienteSocket) {
-        
+    public static SecretKey[] generarLlaves(byte[] datos) {
+        try {
+            MessageDigest sha512 = MessageDigest.getInstance("SHA-512");
+            byte[] digest = sha512.digest(datos);
+
+            byte[] claveCifrado = Arrays.copyOfRange(digest, 0, 32);
+            byte[] claveHMAC = Arrays.copyOfRange(digest, 32, 64);
+
+            SecretKey llaveAES = new SecretKeySpec(claveCifrado, "AES");
+
+            SecretKey llaveHMAC = new SecretKeySpec(claveHMAC, "HmacSHA256");
+
+            return new SecretKey[] { llaveAES, llaveHMAC };
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
     }
     
-    public static byte[] firmarDatos(byte[] datos) {
-        return datos;
+ // Cifrar
+    public static byte[] cifrarAES(byte[] datos, SecretKey llaveAES, IvParameterSpec iv) throws Exception {
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.ENCRYPT_MODE, llaveAES, iv);
+        return cipher.doFinal(datos);
+    }
+
+    // Descifrar
+    public static byte[] descifrarAES(byte[] datosCifrados, SecretKey llaveAES, IvParameterSpec iv) throws Exception {
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.DECRYPT_MODE, llaveAES, iv);
+        return cipher.doFinal(datosCifrados);
+    }
+
+    // Calcular HMAC
+    public static byte[] calcularHMAC(byte[] datos, SecretKey llaveHMAC) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(llaveHMAC);
+        return mac.doFinal(datos);
     }
     
-    public static byte[] cifrarAES(byte[] datos, SecretKey llaveAES, IvParameterSpec iv) {
-        return datos;
-    }
-    
-    public static byte[] calcularHMAC(byte[] datos, SecretKey llaveHMAC) {
-        return datos;
+    public static void delegadosServidor(int puerto, String direccion) {
+
     }
 }
