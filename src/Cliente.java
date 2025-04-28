@@ -1,11 +1,18 @@
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.net.PortUnreachableException;
 import java.net.Socket;
+import java.net.UnknownHostException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Scanner;
 import java.util.Set;
 
 import javax.crypto.SecretKey;
@@ -13,11 +20,74 @@ import javax.crypto.spec.IvParameterSpec;
 
 public class Cliente {
 	
-	private String direccionServidor;
-	private int puertoServidor;
+	//Servidor
+	private static String direccionServidor = "localhost";
+	private static int puertoServidor = 1234;
+	
+	//Para leer mensajes
+	static Socket socket = null;
+	static InputStreamReader inputStreamReader = null;
+	static OutputStreamWriter outputStreamWriter = null;
+	static BufferedReader bufferedReader = null;
+	static BufferedWriter bufferedWriter = null;
+	
+	//Criptografia
 	private PrivateKey llavePrivadaCliente;
 	private PrivateKey llavePublicaCliente;
 	public PublicKey llavePublicaServidor;
+	
+	public static void main(String[] args) {
+		
+		try {
+			
+			Socket socket = new Socket(direccionServidor,puertoServidor);
+			
+			inputStreamReader = new InputStreamReader(socket.getInputStream());
+			outputStreamWriter = new OutputStreamWriter(socket.getOutputStream());
+			
+			bufferedReader = new BufferedReader(inputStreamReader);
+			bufferedWriter = new BufferedWriter(outputStreamWriter);
+			
+			Scanner scanner = new Scanner(System.in);
+			
+			while(true) {
+				
+				String msgToSend = scanner.nextLine();
+				
+				bufferedWriter.write(msgToSend);
+				bufferedWriter.newLine();
+				bufferedWriter.flush();
+				
+				System.out.println("Server: " + bufferedReader.readLine());
+				
+				if(msgToSend.equalsIgnoreCase("END")) break;	
+			}
+			
+		} catch (IOException e) {
+			
+			System.out.println("Error en el socket");
+			e.printStackTrace();
+			
+		} finally {			
+			try {
+				if(socket != null) 
+					socket.close();
+				if(inputStreamReader != null) 
+					inputStreamReader.close();
+				if(outputStreamWriter != null) 
+					outputStreamWriter.close();
+				if(bufferedReader != null) 
+					bufferedReader.close();
+				if(bufferedWriter != null) 
+					bufferedWriter.close();
+			} catch (IOException e) {
+				System.out.println("Error al cerrar socket");
+				e.printStackTrace();
+			}
+			
+		}
+		
+	}
 	
 	public Cliente(String direccionServidor, int puertoServidor, PublicKey llavePublicaServidor) {
 		

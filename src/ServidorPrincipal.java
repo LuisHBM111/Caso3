@@ -1,4 +1,8 @@
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.security.KeyPair;
@@ -6,6 +10,7 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Scanner;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
@@ -24,32 +29,75 @@ public class ServidorPrincipal {
         
     }
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws IOException {
 		
-		KeyPair keyPair = null;
+		Socket socket = null;
+		InputStreamReader inputStreamReader = null;
+		OutputStreamWriter outputStreamWriter = null;
+		BufferedReader bufferedReader = null;
+		BufferedWriter bufferedWriter = null;
+		ServerSocket serverSocket = null;
 		
-		try {
-			keyPair = Criptografia.generarLlavesRSA();
-		} catch (Exception e) {
-			System.out.println("No se pudo generar la llave RSA");
-			e.printStackTrace();
+		serverSocket = new ServerSocket(1234);
+		
+		while(true) {
+			
+			try {
+				
+				socket = serverSocket.accept();
+				
+				inputStreamReader = new InputStreamReader(socket.getInputStream());
+				outputStreamWriter = new OutputStreamWriter(socket.getOutputStream());
+				
+				bufferedReader = new BufferedReader(inputStreamReader);
+				bufferedWriter = new BufferedWriter(outputStreamWriter);
+				
+				while(true) {
+					
+					String msgFromClient = bufferedReader.readLine();
+					
+					System.out.println("Cliente: " + msgFromClient);
+					
+					bufferedWriter.write("Mensaje recibido");
+					bufferedWriter.newLine();
+					bufferedWriter.flush();
+					
+					if(msgFromClient.equalsIgnoreCase("END"))break;
+					
+				}
+				
+				socket.close();
+				inputStreamReader.close();
+				outputStreamWriter.close();
+				bufferedReader.close();
+				bufferedWriter.close();
+				
+			}catch (IOException e) {
+				e.printStackTrace();
+				}
+			}
 		}
-		
-		if (args.length != 1) {
-            System.out.println("Uso: java ServidorPrincipal <puerto>");
-            return;
-        }
+	
+	/*try {
+	keyPair = Criptografia.generarLlavesRSA();
+} catch (Exception e) {
+	System.out.println("No se pudo generar la llave RSA");
+	e.printStackTrace();
+}
 
-        int puerto = Integer.parseInt(args[0]);
-        ServidorPrincipal servidor = new ServidorPrincipal(puerto);
+if (args.length != 1) {
+    System.out.println("Uso: java ServidorPrincipal <puerto>");
+    return;
+}
 
-        servidor.cargarServicios();
-        servidor.cargarLLaves(keyPair);
-        servidor.iniciarServidor();
-        
-        Cliente cliente = new Cliente(direccionServidor, puerto, llavePublicaRSA);
+int puerto = Integer.parseInt(args[0]);
+ServidorPrincipal servidor = new ServidorPrincipal(puerto);
 
-	}
+servidor.cargarServicios();
+servidor.cargarLLaves(keyPair);
+servidor.iniciarServidor();
+
+Cliente cliente = new Cliente(direccionServidor, puerto, llavePublicaRSA);*/
 	
 	private void cargarServicios() {
 		
