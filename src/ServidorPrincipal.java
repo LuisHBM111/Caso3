@@ -79,171 +79,10 @@ public class ServidorPrincipal {
         }
         
         while (true) {
-            Socket socket = null;
-            BufferedReader bufferedReader = null;
-            BufferedWriter bufferedWriter = null;
-            
-            try {
-                socket = serverSocket.accept();
-                System.out.println("Cliente conectado.");
-                
-                bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                bufferedWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-                
-                String mensajeInicial = "P: " + primo + " G: " + g + " LlavePublicaServidor: " + B + " Iv: " + Base64.getEncoder().encodeToString(iv.getIV());
-                
-                String firma = firmarMensaje(mensajeInicial);
-                
-                bufferedWriter.write(mensajeInicial);
-                bufferedWriter.newLine();
-                bufferedWriter.write("Firma: " + firma);
-                bufferedWriter.newLine();
-                bufferedWriter.flush();
-
-                String clientePublicKeyStr = bufferedReader.readLine();
-                
-                if (clientePublicKeyStr != null) {
-                    if (clientePublicKeyStr.contains("LlavePublicaCliente:")) {
-                        clientePublicKeyStr = clientePublicKeyStr.replace("LlavePublicaCliente:", "").trim();
-                    }
-                    A = new BigInteger(clientePublicKeyStr);
-                    
-                    generarLLavePrivada();
-                    SecretKey[] llaves = generarLlaves(s.toByteArray());
-                    SecretKey llaveAES = llaves[0];
-                    SecretKey llaveHMAC = llaves[1];
-
-                    System.out.println("Llave pública del cliente: " + A);
-                    System.out.println("Llave privada generada: " + s);
-                    
-                } else {
-                    System.err.println("Error en la llave pública recibida. Cerrando conexión.");
-                    socket.close();
-                    continue;
-                }
-
-                while (true) {
-                    String msgFromClient = bufferedReader.readLine();
-                    
-                    if (msgFromClient == null) {
-                        System.out.println("Cliente desconectado.");
-                        break;
-                    }
-                    
-                    System.out.println("Cliente: " + msgFromClient);
-                    
-                    if (msgFromClient.equalsIgnoreCase(mensajeCifrado("END"))) {
-                        System.out.println("Cliente pidió terminar la conexión.");
-                        break;
-                    }
-                    
-                    if (msgFromClient.equalsIgnoreCase(mensajeCifrado("servicios"))) {
-                    	
-                    	long inicioCifrado = System.nanoTime();
-                    	
-                    	byte[] datosCifradosServicios = null;
-                    	byte[] hmacServicios = null;
-                    	
-						try {
-							datosCifradosServicios = cifrarAES(serviciosList.getBytes(), llaveAES, iv);
-							hmacServicios = calcularHMAC(datosCifradosServicios, llaveHMAC);
-						} catch (Exception e) {
-							e.printStackTrace();
-						}
-						
-						byte[] mensajeServicios = concatenarBytes(datosCifradosServicios, hmacServicios);
-
-				        String mensajeBase64Servicios = Base64.getEncoder().encodeToString(mensajeServicios);
-
-                        bufferedWriter.write(mensajeBase64Servicios);
-                        bufferedWriter.newLine();
-                        bufferedWriter.flush();
-                        
-                        long finCifrado = System.nanoTime();
-
-                        long tiempoCifrado = finCifrado - inicioCifrado;
-                        System.out.println("Tiempo para cifrar la tabla de servicios: " + tiempoCifrado + " nanosegundos");
-                        
-                        String msgFromClient2 = bufferedReader.readLine();
-                        
-                        long inicioVerificacion = System.nanoTime();
-                        
-                        boolean valido = verificarMensajeConHMAC(msgFromClient2, llaveAES, llaveHMAC, iv);
-                        
-                        if (!valido) {
-                        	System.out.println("Error en la verificacion");
-                        }else {
-                        	System.out.println("Verficacion exitosa");
-                        }
-                        
-                        long finVerificacion = System.nanoTime();
-                        
-                        long tiempoVerificacion = finVerificacion - inicioVerificacion;
-                        System.out.println("Tiempo para verificar la consulta del cliente: " + tiempoVerificacion + " nanosegundos");
-                        
-                        if (msgFromClient2.equalsIgnoreCase(mensajeCifrado("1"))) {
-                        	
-    				        try {
-								bufferedWriter.write(mensajeCifrado("PUERTO: 5001 DIRECCION: localhost"));
-							} catch (Exception e) {
-								e.printStackTrace();
-							}
-                            bufferedWriter.newLine();
-                            bufferedWriter.flush();
-                            
-                        } else if (msgFromClient2.equalsIgnoreCase(mensajeCifrado("2"))) {
-                        	
-    				        try {
-								bufferedWriter.write(mensajeCifrado("PUERTO: 5002 DIRECCION: localhost"));
-							} catch (Exception e) {
-								e.printStackTrace();
-							}
-                            bufferedWriter.newLine();
-                            bufferedWriter.flush();
-                            
-                        } else if (msgFromClient2.equalsIgnoreCase(mensajeCifrado("3"))) {
-                        	
-                            try {
-								bufferedWriter.write(mensajeCifrado("PUERTO: 5003 DIRECCION: localhost"));
-							} catch (Exception e) {
-								e.printStackTrace();
-							}
-                            bufferedWriter.newLine();
-                            bufferedWriter.flush();
-                            
-                        } else {
-                        	try {
-								bufferedWriter.write(mensajeCifrado("-1 (TENÍAS QUE ESCRIBIR '1' O '2' O '3')"));
-							} catch (Exception e) {
-								e.printStackTrace();
-							}
-                            bufferedWriter.newLine();
-                            bufferedWriter.flush();
-                        }
-                    } else {
-                    	try {
-							bufferedWriter.write(mensajeCifrado("Comando no reconocido. Escribe 'SERVICIOS' o 'END'."));
-						} catch (Exception e) {
-							e.printStackTrace();
-						}
-                        bufferedWriter.newLine();
-                        bufferedWriter.flush();
-                    }
-                }
-                
-            } catch (IOException e) {
-                e.printStackTrace();
-            } finally {
-                try {
-                    if (socket != null) socket.close();
-                    if (bufferedReader != null) bufferedReader.close();
-                    if (bufferedWriter != null) bufferedWriter.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
+        	Socket socket = serverSocket.accept();
+    	    new Thread(() -> manejarCliente(socket)).start();
+        	}
         }
-    }
     
     private void cargarServicios() {
         tablaServicios = new HashMap<>();
@@ -367,24 +206,13 @@ public class ServidorPrincipal {
         return result;
     }
     
-    public static String mensajeCifrado(String mensaje) throws Exception {
-    	
-    	byte[] datosCifradosServicio = null;
-    	byte[] hmacServicio = null;
-    	
-		try {
-			datosCifradosServicio = cifrarAES(mensaje.getBytes(), llaveAES, iv);
-			hmacServicio = calcularHMAC(datosCifradosServicio, llaveHMAC);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		
-		byte[] mensajeServicio = concatenarBytes(datosCifradosServicio, hmacServicio);
-
-        String mensajeBase64Servicio = Base64.getEncoder().encodeToString(mensajeServicio);
-        
-        return mensajeBase64Servicio;
+    public static String mensajeCifrado(String mensaje, SecretKey llaveAES, SecretKey llaveHMAC) throws Exception {
+        byte[] datosCifrados = cifrarAES(mensaje.getBytes(), llaveAES, iv);
+        byte[] hmac = calcularHMAC(datosCifrados, llaveHMAC);
+        byte[] mensajeFinal = concatenarBytes(datosCifrados, hmac);
+        return Base64.getEncoder().encodeToString(mensajeFinal);
     }
+
     
     public static void cargarLlavePrivadaServidor(String rutaLlavePrivada) throws Exception {
         byte[] keyBytes = Files.readAllBytes(Paths.get(rutaLlavePrivada));
@@ -430,6 +258,117 @@ public class ServidorPrincipal {
             }
         }
     }
+    
+    public static void manejarCliente(Socket socket) {
+        try (
+            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()))
+        ) {
+            System.out.println("Cliente conectado.");
+
+            String mensajeInicial = "P: " + primo + " G: " + g + " LlavePublicaServidor: " + B +
+                    " Iv: " + Base64.getEncoder().encodeToString(iv.getIV());
+
+            String firma = firmarMensaje(mensajeInicial);
+            bufferedWriter.write(mensajeInicial);
+            bufferedWriter.newLine();
+            bufferedWriter.write("Firma: " + firma);
+            bufferedWriter.newLine();
+            bufferedWriter.flush();
+
+            // Recibir la llave pública del cliente
+            String clientePublicKeyStr = bufferedReader.readLine();
+            if (clientePublicKeyStr != null && clientePublicKeyStr.contains("LlavePublicaCliente:")) {
+                clientePublicKeyStr = clientePublicKeyStr.replace("LlavePublicaCliente:", "").trim();
+                BigInteger A_local = new BigInteger(clientePublicKeyStr);
+
+                BigInteger s_local = A_local.modPow(b, primo);
+                SecretKey[] llaves = generarLlaves(s_local.toByteArray());
+                SecretKey llaveAES_local = llaves[0];
+                SecretKey llaveHMAC_local = llaves[1];
+
+                System.out.println("Llave pública del cliente: " + A_local);
+                System.out.println("Llave privada generada: " + s_local);
+
+                // Crear lista de servicios local
+                StringBuilder serviciosList = new StringBuilder();
+                for (Servicio servicio : tablaServicios.values()) {
+                    serviciosList.append(servicio.getId()).append(" - ").append(servicio.getNombre()).append(" || ");
+                }
+
+                // Ciclo de interacción con el cliente
+                while (true) {
+                    String msgFromClient = bufferedReader.readLine();
+                    if (msgFromClient == null) break;
+
+                    if (msgFromClient.equalsIgnoreCase(mensajeCifrado("END", llaveAES_local, llaveHMAC_local))) {
+                        System.out.println("Cliente pidió terminar.");
+                        break;
+                    }
+
+                    if (msgFromClient.equalsIgnoreCase(mensajeCifrado("SERVICIOS", llaveAES_local, llaveHMAC_local))) {
+
+                        long inicioCifrado = System.nanoTime();
+
+                        byte[] datosCifradosServicios = cifrarAES(serviciosList.toString().getBytes(), llaveAES_local, iv);
+                        byte[] hmacServicios = calcularHMAC(datosCifradosServicios, llaveHMAC_local);
+                        byte[] mensajeFinal = concatenarBytes(datosCifradosServicios, hmacServicios);
+                        String mensajeBase64 = Base64.getEncoder().encodeToString(mensajeFinal);
+
+                        bufferedWriter.write(mensajeBase64);
+                        bufferedWriter.newLine();
+                        bufferedWriter.flush();
+
+                        long finCifrado = System.nanoTime();
+                        System.out.println("Tiempo cifrado tabla: " + (finCifrado - inicioCifrado) + " ns");
+
+                        String msgFromClient2 = bufferedReader.readLine();
+
+                        long inicioVerificacion = System.nanoTime();
+                        boolean valido = verificarMensajeConHMAC(msgFromClient2, llaveAES_local, llaveHMAC_local, iv);
+                        long finVerificacion = System.nanoTime();
+
+                        System.out.println("Verificación HMAC: " + (valido ? "Exitosa" : "Fallida"));
+                        System.out.println("Tiempo verificación HMAC: " + (finVerificacion - inicioVerificacion) + " ns");
+
+                        if (!valido) break;
+
+                        String respuesta;
+                        if (msgFromClient2.equalsIgnoreCase(mensajeCifrado("1", llaveAES_local, llaveHMAC_local))) {
+                            respuesta = mensajeCifrado("PUERTO: 5001 DIRECCION: localhost", llaveAES_local, llaveHMAC_local);
+                        } else if (msgFromClient2.equalsIgnoreCase(mensajeCifrado("2", llaveAES_local, llaveHMAC_local))) {
+                            respuesta = mensajeCifrado("PUERTO: 5002 DIRECCION: localhost", llaveAES_local, llaveHMAC_local);
+                        } else if (msgFromClient2.equalsIgnoreCase(mensajeCifrado("3", llaveAES_local, llaveHMAC_local))) {
+                            respuesta = mensajeCifrado("PUERTO: 5003 DIRECCION: localhost", llaveAES_local, llaveHMAC_local);
+                        } else {
+                            respuesta = mensajeCifrado("-1 (TENÍAS QUE ESCRIBIR '1', '2' o '3')", llaveAES_local, llaveHMAC_local);
+                        }
+
+                        bufferedWriter.write(respuesta);
+                        bufferedWriter.newLine();
+                        bufferedWriter.flush();
+                    } else {
+                        String respuesta = mensajeCifrado("Comando no reconocido. Usa 'SERVICIOS' o 'END'.", llaveAES_local, llaveHMAC_local);
+                        bufferedWriter.write(respuesta);
+                        bufferedWriter.newLine();
+                        bufferedWriter.flush();
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            System.err.println("❌ Error al manejar cliente:");
+            e.printStackTrace();
+        } finally {
+            try {
+                socket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+
     
     public class GeneradorLlavesRSAA {
 

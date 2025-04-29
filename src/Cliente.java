@@ -5,9 +5,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.math.BigInteger;
-import java.net.PortUnreachableException;
 import java.net.Socket;
-import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.KeyFactory;
@@ -16,18 +14,13 @@ import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.PrivateKey;
 import java.security.PublicKey;
-import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import java.util.Scanner;
-import java.util.Set;
 
 import javax.crypto.Cipher;
 import javax.crypto.Mac;
@@ -211,7 +204,7 @@ public class Cliente {
 	        long finFirma = System.nanoTime();
 
             long tiempoFirma = finFirma - inicioFirma;
-            System.out.println("Tiempo para verificar Firma: " + tiempoFirma + " nanosegundos");
+            EstadisticasGlobales.totalTiempoFirma.addAndGet(finFirma - inicioFirma);
 
 	        BigInteger primo = null;
 	        BigInteger g = null;
@@ -328,6 +321,20 @@ public class Cliente {
         publicKeyServidor = KeyUtils.cargarLlavePublica(rutaLlavePublica);
     }
     
+    public static boolean verificarFirma(String mensaje, String firmaBase64) {
+        try {
+            Signature publicSignature = Signature.getInstance("SHA256withRSA");
+            publicSignature.initVerify(publicKeyServidor);
+            publicSignature.update(mensaje.getBytes("UTF-8"));
+
+            byte[] firmaBytes = Base64.getDecoder().decode(firmaBase64);
+            return publicSignature.verify(firmaBytes);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
     public class GeneradorLlavesRSAA {
 
         public static void generarLlaves(String rutaLlavePrivada, String rutaLlavePublica) {
@@ -356,20 +363,6 @@ public class Cliente {
         }
     }
     
-    public static boolean verificarFirma(String mensaje, String firmaBase64) {
-        try {
-            Signature publicSignature = Signature.getInstance("SHA256withRSA");
-            publicSignature.initVerify(publicKeyServidor);
-            publicSignature.update(mensaje.getBytes("UTF-8"));
-
-            byte[] firmaBytes = Base64.getDecoder().decode(firmaBase64);
-            return publicSignature.verify(firmaBytes);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
-    
     public class KeyUtils {
 
         public static PrivateKey cargarLlavePrivada(String rutaArchivo) throws Exception {
@@ -386,11 +379,4 @@ public class Cliente {
             return kf.generatePublic(spec);
         }
     }
-    
-	public static void delegadosCliente(Socket socket) {
-		//Diffie-Hellman, recibe tabla, elige servicio, envía id, etc.
-		//mostrarServicios(Map<Integer, String> servicios)
-		//seleccionarServicio(Set<Integer> serviciosIdsDisponibles)
-	}
-	
 }
