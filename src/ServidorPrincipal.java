@@ -19,9 +19,11 @@ import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
@@ -78,11 +80,24 @@ public class ServidorPrincipal {
             serviciosList += servicio.getId() + " - " + servicio.getNombre() + " || ";
         }
         
-        while (true) {
-        	Socket socket = serverSocket.accept();
-    	    new Thread(() -> manejarCliente(socket)).start();
-        	}
+        List<Thread> hilosClientes = new ArrayList<>();
+
+        int cantidadClientesEsperados = 16;
+
+        for (int i = 0; i < cantidadClientesEsperados; i++) {
+            Socket socket = serverSocket.accept();
+            Thread t = new Thread(() -> manejarCliente(socket));
+            t.start();
+            hilosClientes.add(t);
         }
+        for (Thread t : hilosClientes) {
+            t.join();
+        }
+        System.out.println("\n📊 Estadísticas totales de todos los clientes:");
+        System.out.println("⏱ Tiempo total de firma: " + EstadisticasGlobales.totalTiempoFirma.get() + " ns");
+        System.out.println("⏱ Tiempo total de cifrado: " + EstadisticasGlobales.totalTiempoCifrado.get() + " ns");
+        System.out.println("⏱ Tiempo total de verificación HMAC: " + EstadisticasGlobales.totalTiempoVerificacionHMAC.get() + " ns");
+    }
     
     private void cargarServicios() {
         tablaServicios = new HashMap<>();
@@ -305,8 +320,9 @@ public class ServidorPrincipal {
                         System.out.println("Cliente pidió terminar.");
                         break;
                     }
-
-                    if (msgFromClient.equalsIgnoreCase(mensajeCifrado("SERVICIOS", llaveAES_local, llaveHMAC_local))) {
+                    
+                    String mensajePlano = obtenerMensajeDescifrado(msgFromClient, llaveAES_local, llaveHMAC_local, iv);
+                    if (mensajePlano != null && mensajePlano.equalsIgnoreCase("SERVICIOS")) {
 
                         long inicioCifrado = System.nanoTime();
 
@@ -320,7 +336,7 @@ public class ServidorPrincipal {
                         bufferedWriter.flush();
 
                         long finCifrado = System.nanoTime();
-                        System.out.println("Tiempo cifrado tabla: " + (finCifrado - inicioCifrado) + " ns");
+                        EstadisticasGlobales.totalTiempoCifrado.addAndGet(finCifrado - inicioCifrado);
 
                         String msgFromClient2 = bufferedReader.readLine();
 
@@ -329,7 +345,7 @@ public class ServidorPrincipal {
                         long finVerificacion = System.nanoTime();
 
                         System.out.println("Verificación HMAC: " + (valido ? "Exitosa" : "Fallida"));
-                        System.out.println("Tiempo verificación HMAC: " + (finVerificacion - inicioVerificacion) + " ns");
+                        EstadisticasGlobales.totalTiempoVerificacionHMAC.addAndGet(finVerificacion - inicioVerificacion);
 
                         if (!valido) break;
 
@@ -368,7 +384,16 @@ public class ServidorPrincipal {
         }
     }
 
-
+    public static String obtenerMensajeDescifrado(String mensajeBase64, SecretKey aes, SecretKey hmac, IvParameterSpec iv) {
+        try {
+            if (!verificarMensajeConHMAC(mensajeBase64, aes, hmac, iv)) return null;
+            byte[] mensajeBytes = Base64.getDecoder().decode(mensajeBase64);
+            byte[] datosCifrados = Arrays.copyOfRange(mensajeBytes, 0, mensajeBytes.length - 32);
+            return new String(descifrarAES(datosCifrados, aes, iv));
+        } catch (Exception e) {
+            return null;
+        }
+    }
     
     public class GeneradorLlavesRSAA {
 
